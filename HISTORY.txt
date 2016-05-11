@@ -1,0 +1,57 @@
+summary2016-01-05_22h36, Tue Jan  5 22:36:03 CET 2016:
+trying to understand HMM derivations
+
+summary2016-01-06_00h19, Wed Jan  6 00:19:54 CET 2016:
+deriving viterbi algorithm
+
+summary2016-01-06_13h41, Wed Jan  6 13:41:43 CET 2016:
+finished viterbi recursion, moving to fwd alg
+
+summary2016-01-06_19h43, Wed Jan  6 19:43:17 CET 2016:
+finished backward algorithm
+
+summary2016-01-07_23h37, Thu Jan  7 23:37:47 CET 2016:
+added stubs for EM and Baum-Welch, started bayesian inference sect
+
+summary2016-01-08_14h24, Fri Jan  8 14:24:47 CET 2016:
+refined marginalization, posterior, prior, etc to explain bayesian inference
+
+summary2016-01-08_19h13, Fri Jan  8 19:13:56 CET 2016:
+added bayesian inference and hiv example
+
+summary2016-01-17_17h47, Sun Jan 17 17:47:26 CET 2016:
+finished global alignment explanation
+
+summary2016-01-17_20h44, Sun Jan 17 20:44:08 CET 2016:
+finished significance of alignments
+
+summary2016-01-17_23h21, Sun Jan 17 23:21:56 CET 2016:
+added substitution scores, now working on blosum matrices
+
+summary2016-01-18_10h53, Mon Jan 18 10:53:57 CET 2016:
+finished part1 with blast
+
+summary2016-01-18_11h32, Mon Jan 18 11:32:06 CET 2016:
+splitting big tex into several parts
+
+summary2016-01-18_17h19, Mon Jan 18 17:19:23 CET 2016:
+describing proof of freq=ni/N result
+
+summary2016-01-18_18h01, Mon Jan 18 18:01:15 CET 2016:
+finished proof of freq using multinomial
+
+summary2016-01-19_12h08, Tue Jan 19 12:08:08 CET 2016:
+finished pseudocount proof
+
+summary2016-01-19_17h43, Tue Jan 19 17:43:41 CET 2016:
+finished dirichlet mixture
+
+summary2016-01-20_18h07, Wed Jan 20 18:07:55 CET 2016:
+added baum-welch draft
+
+summary2016-01-21_00h46, Thu Jan 21 00:46:32 CET 2016:
+added EM section
+
+summary2016-01-21_11h47, Thu Jan 21 11:47:28 CET 2016:
+updates to EM
+
