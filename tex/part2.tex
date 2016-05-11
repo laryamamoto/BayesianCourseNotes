@@ -1,0 +1,937 @@
+
+\newpage
+\section{Part 2: Bayesian Statistics}
+
+\subsection{Data, Model and Parameters}
+
+We would like to build a model of the world $M$ with parameters $\theta$ based on some observed data $D$. The model should be such that it is possible to tune its parameters $\theta$ until they fit the data $D$ as closely as possible, so that the model with the parameters closely reproduce the reality.
+
+We focus on biological problems typically involving the analysis of DNA and protein sequences, so here are some examples of the kind of data, parameters and models we'll be looking at:
+
+\begin{itemize}
+\item Problem: Estimate natural frequencies of nucleotides or amino acids based on data from multiple sequence alignments:
+\begin{itemize}
+\item {\bf Data $D$:} A set of counts $n$ for each type of nucleotide or amino acid in a column of a multiple sequence alignment.
+\item {\bf Model $M$:} Maximum likelihood and posterior mean estimate using multinomial and Dirichlet distributions, with a Dirichlet mixture in case multiple classes ({\em sources}) are present.
+\item {\bf Parameters $\theta$:} The estimated frequency $\theta_k=q_k$ of each type of nucleotide or amino acid in a column of a multiple sequence alignment. The frequencies may apply to the whole alignment or may be divided into classes $S=k$ (sources) in case regions of the alignment have different characteristics leading to different frequency distributions (e.g. hydrophobic vs. hydrophilic regions).
+The path $\pi$ through a set of states in a HMM.
+\end{itemize}
+%
+\item Problem: Look for patterns in a given sequence or set of sequences:
+\begin{itemize}
+\item {\bf Data $D$:} A set of sequences $x$ each of length $L$ (variable or fixed length).
+\item {\bf Model $M$:} HMM with a predefined architecture (set of states and transitions).
+\item {\bf Parameters $\theta$:} The transition probabilities $a_{kl}$, emission probabilities $e_k(b)$, and the path $\pi$ through a set of states in the HMM.
+\end{itemize}
+%
+\end{itemize}
+
+\subsection{Product Rule, Bayes' Rule, and Marginalization}
+
+\begin{itemize}
+
+\item {\bf Product rule:} \textcolor{green}{(sl 9, lec 4)} \\
+The probability that A and B are true at the same time given C is equal to
+the probability of B given A times the probability of A.
+\begin{eqnarray}
+P(A,B|C) & = & P(B|A,C)*P(A|C) = \nonumber \\
+P(B,A|C) & = & P(A|B,C)*P(B|C)   \label{eq:prodrule}
+\end{eqnarray}
+
+When $C$ is always given anyway, we can simplify the formula by making $C$ implicit:
+\begin{eqnarray}
+P(A,B) & = & P(B|A)*P(A) = \nonumber \\
+P(B,A) & = & P(A|B)*P(B)   \label{eq:prodrule-simple}
+\end{eqnarray}
+
+\item {\bf Bayes' rule:} \textcolor{green}{(sl 9, lec 4)} \\
+
+Rearranging eq. (\ref{eq:prodrule}) leads to two equivalent forms of Bayes' Rule:
+\begin{equation}
+P(B|A,C)*P(A|C) = P(A|B,C)*P(B|C) \Rightarrow \nonumber
+\end{equation}
+\begin{equation}
+\boxed{P(B|A,C) = \frac{P(A|B,C) P(B|C)}{P(A|C)}}
+\end{equation}
+or equivalently:
+\begin{equation}
+\boxed{P(A|B,C) = \frac{P(B|A,C) P(A|C)}{P(B|C)}}
+\end{equation}
+
+Starting from equation (\ref{eq:prodrule-simple}), we obtain the more popular form of Bayes rule:
+\begin{equation}
+P(A|B) = \frac{P(B|A) P(A)}{P(B)}
+\end{equation}
+
+\item {\bf Marginalization rule}, or marginalization trick: \textcolor{green}{(sl 22, lec 4)} \\
+The sum of all the possible outcomes on one particular dimension of the problem must add up to 1, that is, the probabilities of all the possible cases must add up to one.
+\begin{eqnarray}
+\sum_{k=1}^K P(Y=k) & = & 1 \\
+\sum_{k=1}^K P(X,Y=k) & = & P(X) \\
+\int_{y \in Y} P(X,Y=y) dy & = & P(X)
+\end{eqnarray}
+
+We often encounter a conditional probability case where a hidden variable $Y$ has an influence on $P(A|B)$, but we cannot assume any particular value for $Y$. In this case, in order to compute $P(A|B)$ we must take into account all possible values of $Y$ given $B$, weighted by their respective probabilities:
+\begin{itemize}
+\item For Y discrete:
+\begin{eqnarray}
+P(A|B) & = & \sum_{k=1}^K P(A,Y=k|B) \nonumber \\
+       & = & \sum_{k=1}^K P(A|Y=k,B) \; P(Y=k|B) \label{eq:margcond1} \\
+\end{eqnarray}
+\item For Y continuous:
+\begin{eqnarray}
+P(A|B) & = & \int_{y \in Y} P(A,Y=y|B) \; dy \nonumber \\
+       & = & \int_{y \in Y} P(A|Y=y,B) \; P(Y=y|B) \; dy
+\label{eq:margcond2}
+\end{eqnarray}
+\end{itemize}
+
+This conditional form of the marginalization rule is often used.
+%Equations (\ref{eq:margcond1}) and (\ref{eq:margcond2}) tell us that when we need to compute the probability of a certain event $A$ given another event $B$, but there is a third variable $Y$ that has an influence on the outcome $P(A|B)$, 
+
+\end{itemize}
+
+\subsection{Prior, Posterior, Evidence, Likelihood}
+
+\begin{itemize}
+
+\item
+$P(\theta|M)$ = {\bf Prior}:
+A priori knowledge or {\em belief} about what the parameters $\theta$ of my model $M$ might be,
+{\em before} we actually see any data $D$.
+The prior is a distribution of the parameters $\theta$.
+The initial prior should be as neutral as possible: avoid zero!
+
+\item
+$P(D|\theta,M)$ = {\bf Likelihood} of the data:
+Probability of seeing the data $D$ with the model $M$ under the model parameters $\theta$, {\em before} we actually see any data $D$: for a given combination of $\{\theta,M\}$, we'll see data $D$ of a certain form, for another combination of $\{\theta,M\}$, we'll see another kind of data $D$.
+
+We will usually be interested in the {\bf maximum likelihood} that is, the combination of $\theta$ parameters for a given model $M$ that maximizes the likelihood of seeing $D$, without assuming that $D$ is given (section \ref{sec:maxlikelihood}).
+
+\item
+$P(\theta|D,M)$ = {\bf Posterior}:
+Updated probability of parameters $\theta$ {\em after} seeing the data $D$.
+Usually more peaked than the prior $P(\theta|M)$ because now we know more.
+We reduced the uncertainty by seeing $D$, hence reduced the standard deviation $\sigma$, making the probability density function narrower.
+
+\item
+$P(D|M)$ = {\bf Evidence}:
+Probability of observing the data $D$ with the given model $M$, independently of the parameters $\theta$ used. Therefore to compute the evidence we must take into account all possible values that the parameters $\theta$ can take to produce $D$ from $M$, that is: the weighted sum of the probability of each possible set of parameters ($P(\theta|M)$, the prior) weighted by the chance of observing $D$ with the model $M$ under that particular set of parameters ($P(D|\theta,M$), which is the likelihood). This can be computed by marginalization:
+%
+\begin{equation}
+P(D|M) = \int_\theta P(D|\theta,M) P(\theta|M) d\theta
+\label{eq:evidencemarg1}
+\end{equation}
+when $\theta$ is continuous, or
+\begin{equation}
+P(D|M) = \sum_\theta P(D|\theta,M) P(\theta|M)
+\label{eq:evidencemarg2}
+\end{equation}
+when $\theta$ is discrete.
+
+\end{itemize}
+
+\subsubsection{Relationship Between Prior, Posterior, Evidence, and Likelihood}
+
+Using Bayes' rule:
+\begin{eqnarray}
+P(\theta|D,M) & = & P(D|\theta,M) \; \frac{P(\theta|M)}{P(D|M)} \Rightarrow 
+\label{eq:posteriorbayes}
+\\
+P(\theta|D,M) \; P(D|M) & = & P(D|\theta,M)  \; P(\theta|M)
+\end{eqnarray}
+which means:
+\begin{equation}
+\text{posterior} * \text{evidence} = \text{likelihood} * \text{prior}
+\label{eq:posteriorbayes0}
+\end{equation}
+
+\subsection{Maximum Likelihood (ML) \textcolor{green}{(sl 16)}}
+\label{sec:maxlikelihood}
+
+Seek the values of $\theta$ that give the maximum probability of seeing the data with the given model, {\em without knowing the data in advance!!} \\
+Often expressed in logarithmic scale:
+\begin{equation}
+\boxed{\theta^{\text{ML}} = \argmax_\theta \; P(D|\theta,M)
+                  = \argmax_\theta \; \ln \; P(D|\theta,M)}
+\end{equation}
+Tweek $\theta_j$ until the probability $P(D|\theta,M)$ becomes maximum.
+
+\subsection{Maximum a Posteriori (MAP) \textcolor{green}{(sl 17)}}
+
+Pick value of $\theta$ such that the probability of $\theta$ {\em given the data and the model} is maximum: so here you {\em have} the data, in contrast with ML.
+\begin{equation}
+\theta^{MAP} = \argmax \; P(\theta|D,M) 
+\end{equation}
+
+Using Bayes' rule:
+\begin{eqnarray}
+P(\theta|D,M) & = & P(D|\theta,M) \frac{P(\theta|M)}{P(D|M)} \Rightarrow
+\\
+\theta^{MAP} & = & \argmax \; P(\theta|D,M) 
+            = \argmax \; P(D|\theta,M) \frac{P(\theta|M)}{P(D|M)}
+\end{eqnarray}
+
+The evidence term $P(D|M)$ plays no role in the maximization over $\theta$,
+so it can be left out in the computation of $\theta^{MAP}$:
+%or {\em marginalized}, that is, substituted by the integral for all
+%possible values of $\theta$)
+\begin{equation}
+\boxed{\theta^{\text{MAP}} = \argmax \; P(\theta|D,M) 
+                   = \argmax \; P(D|\theta,M) P(\theta|M)}
+\end{equation}
+
+In other words:
+\begin{equation}
+\boxed{\theta^{\text{MAP}} = \argmax (\text{posterior})
+                   = \argmax (\text{likelihood} * \text{prior})}
+\end{equation}
+
+%\textcolor{red}{With both ML and MAP we would like to find optimum parameters, but in ML we maximize the probability of generating good data $D$ with our model (so data that are as close as possible to real world), whereas in MAP we maximize the probability of the parameters $\theta$ after seeing the data. ???? So in MAP we might end up with parameters that are easier to find (because they have a large probability under the given data) but are perhaps suboptimal, wheras in ML we really aim for parameters that fit the data in an optimum way, regardless of how unprobable (or rare, difficult to find) they are. ??? But MAP uses posterior info, so should give better results??? or in ML we maximize the probability of the data but might generate unrealistic data ????}
+
+\subsection{Posterior Mean Estimate (PME) \textcolor{green}{(sl 18 lec 5)}}
+\label{sec:PME}
+
+The Posterior Mean Estimate (PME) is the average of the posterior distribution
+$P(\theta|D,M)$ over all possible values of $\theta$:
+\begin{equation}
+\theta^{\text{PME}} = \int_{\theta \in H} \theta \; P(\theta|D,M) \; d \theta 
+\end{equation}
+%In contrast with MAP, now we can no longer discard the evidence term since we need the whole distribution of ...
+% ... but can replace the evidence by ... using the marginalization trick. ...
+
+\subsection{Bayesian Inference}
+
+In contrast with ML and MAP which only take the maximum, in Bayesian inference we compute whole posterior distribution $P(\theta|D,M)$. Using Bayes rule for the posterior (eq. (\ref{eq:posteriorbayes})):
+\begin{equation}
+\boxed{P(\theta|D,M) = P(D|\theta,M) \; \frac{P(\theta|M)}{P(D|M)}}
+\label{eq:bayesinf}
+\end{equation}
+Which is the same as:
+\begin{equation}
+\text{posterior} = \text{likelihood} * \text{prior} \; / \; \text{evidence}
+\label{eq:bayesinf0}
+\end{equation}
+
+Applying the marginalization rule for the evidence (eq. (\ref{eq:evidencemarg1})):
+\begin{eqnarray}
+P(\theta|D,M) & = & P(D|\theta,M) \; \frac{P(\theta|M)}{P(D|M)} \Rightarrow 
+\label{eq:posteriorbayes2}
+\\
+P(\theta|D,M) & = & 
+ \frac{P(D|\theta,M) \; P(\theta|M)}
+      {\int_{w \in \theta} P(D|w,M) \; P(w|M) \; dw}
+\label{eq:bayesinference}
+\end{eqnarray}
+where the integral $\int_w$ sums over all possible values of $\theta$.
+
+If $\theta$ is discrete:
+\begin{equation}
+P(\theta=i|D,M) =
+ \frac{P(D|\theta=i,M) \; P(\theta=i|M)}
+      {\sum_{j=1}^K P(D|\theta=j,M) \; P(\theta=j|M)}
+\label{eq:bayesinfdiscrete}
+\end{equation}
+
+Another way to arrive at eq. (\ref{eq:bayesinference}) from eq. (\ref{eq:posteriorbayes2}) is to reason that, 
+since we don't have the evidence $P(D|M)$, we can consider that $P(\theta|D,M)$ is proportional to $P(D|\theta,M) P(\theta|M)$: the integral of this product will not sum to one because the term $P(D|M)$ is missing:
+%
+\begin{eqnarray}
+\int_{\theta} P(\theta|D,M) \; d \theta & = & 1 \Rightarrow \\
+\int_{\theta} P(D|\theta,M) \; \frac{P(\theta|M)}{P(D|M)} \; d \theta 
+   & = & 1 \Rightarrow \\
+\frac{1}{P(D|M)} \int_{\theta} P(D|\theta,M) \; P(\theta|M) \; d \theta 
+   & = & 1 \Rightarrow \\
+\int_{\theta} P(D|\theta,M) \; P(\theta | M) \; d \theta & = & P(D|M)
+\label{eq:margDM}
+\end{eqnarray}
+which results in the marginalization rule in eq. (\ref{eq:margcond2}).
+
+By substituting eq. (\ref{eq:margDM}) in eq. (\ref{eq:posteriorbayes2}) we get eq. (\ref{eq:bayesinference}) again as expected (after a change of variables to distinguish the variable $\theta$ from all its possible values $w$):
+\begin{equation}
+P(\theta|D,M) = 
+ \frac{P(D|M,\theta) \; P(\theta|M)}
+       {\int_w P(D|w,M) \; P(w|M) \; dw}
+\end{equation}
+
+Rewriting the marginalization trick for the evidence $P(D|M)$:
+\begin{eqnarray}
+P(D|M) & = & \int_{\theta} P(D,\theta|M) d \theta \\
+       & = & \int_{\theta} P(D|\theta,M) P(\theta|M) d \theta
+\end{eqnarray}
+
+\subsubsection{Examples of Bayesian Inference}
+
+\begin{itemize}
+\item Diagnostic test for HIV: is patient carrier of HIV virus?
+
+Random variable $H \in \{ H+, H- \}$:
+  $H+$ = patient is carrier;
+  $H-$ = patient is not carrier.
+
+Blood sample test $T$ returns positive ($T+$) or negative ($T-$):
+$T \in \{ T+, T- \}$.
+
+The test can return false positives or false negatives, which should be minimized.
+
+Given that if a patient has HIV, then the probability of the test returning $T+$ is: \\
+$P(T+|H+) = 99.8 \%$. \\
+Whereas if the patient is not infected, the probability that the test returns $T+$ is: \\
+$P(T+|H-) = 0.9 \%$.
+
+These numbers are given and fixed for this test. Another parameter that is given is the proportion of infected people in the population. For instance, $P(H+) = 0.002$ in Belgium, $P(H+) = 0.2$ in another country with much larger infected population.
+
+Typical test in Belgium:
+\begin{center}
+\begin{tabular}{lcr}
+$P(T+|H+)$ & = & 0.998 given \\
+$P(T+|H-)$ & = & 0.009 given \\
+$P(H+)$    & = & 0.002 given
+\end{tabular}
+\end{center}
+
+Same test in a country with a much larger infected population:
+\begin{center}
+\begin{tabular}{lcr}
+P(T+|H+) & = & 0.998 given \\
+p(T+|H-) & = & 0.009 given \\
+p(H+)    & = & 0.2   given
+\end{tabular}
+\end{center}
+
+If a patient tests $T+$, what is the probability that s/he has HIV? \\
+Using Bayes' rule:
+\begin{equation}
+P(H+|T+) = P(T+|H+) \; \frac{P(H+)}{P(T+)}
+\end{equation}
+
+Use marginalization: the probability of $T+$ is the probability of testing positive and being HIV+ or being HIV-:
+\begin{eqnarray}
+P(T+) & = & P(T+,H+) + P(T+,H-) \\
+      & = & P(T+|H+) \; P(H+) + P(T+|H-) \; P(H-) \\
+P(H-) & = & 1 - P(H+)
+\end{eqnarray}
+
+$P(H+|T+)$ in Belgium:
+\begin{eqnarray}
+P(H+|T+) & = & P(T+|H+) \; P(H+) + P(T+|H-) \; P(H-) \\
+& = & 0.988 * 0.002 / (0.988 * 0.002 + 0.009 *0.998) \\
+& = & 0.1803248768 \approx 18 \%
+\end{eqnarray}
+
+$P(H+|T+)$ in very infected country:
+\begin{eqnarray}
+P(H+|T+) 
+& = & 0.988 * 0.2 / (0.988 * 0.2 + 0.009 * 0.8) \\
+& = & 0.96484375 \approx 96 \%
+\end{eqnarray}
+
+The larger infected population means that there is a high chance of actually being infected after testing positive, whereas in a small infected population the chance of actually having the disease after testing positive is much lower, because there are so many less people infected in absolute terms.
+
+\item Is the Casino cheating? \\
+Coin: $\theta=0$ or $\theta=1$ \\
+$P(\theta=i|M)$ is the prior probability of casino cheating \\
+%$P(\theta=i|D,M) = P(D|\theta=i,M) P(\theta=i|M)$ ....
+...
+
+\item Multiple Sequence Alignment \\
+...
+\end{itemize}
+
+%---------------------------------------------------------------------------
+
+\subsection{Likelihood Estimation Using the Multinomial Distribution}
+\label{sec:likelihood:multinomial}
+
+Say that we are computing a multiple sequence alignment, and get, for each column of the alignment, a given set of counts for each amino acid or base. These counts are my data $D$.
+For one particular column of the alignment, we get counts $\vec{n} = n_1, ... n_K$. These counts sum to $N$:
+\begin{equation}
+N = n_1 + n_2 + ... + n_K = \sum_{i=1}^K n_i
+\end{equation}
+
+Given the natural frequencies $\theta_i, i=1,...,K$ of each amino acid or base that we are aligning (where K=4 for DNA sequences, K=20 for protein sequences), we would like to know how likely our observed counts $n_i$ are. Our goal is to estimate the likelihood:
+
+\begin{equation}
+P(D|\theta,M) = P(\vec{n}|\vec{\theta}) = P(n|\theta) = 
+P(N_1 = n_1, N_2 = n_2, ... , N_K = n_K | \theta_1, ... , \theta_K)
+\end{equation}
+Note that the explicit vector indicators are often dropped for simplicity, but we must not forget that $n=\vec{n}$ and $\theta=\vec{\theta}$ are actually vectors.
+
+This probability follows a Multinomial Distribution:
+\begin{equation}
+P(n|\theta) \sim \mathcal{M}(n;\theta) =
+\frac{1}{M(n)} \prod_{i=1}^K \theta_i ^ {n_i}
+\end{equation}
+where $M(n)$ is given by:
+\begin{equation}
+M(n) = \frac{\prod_{i=1}^K n_i !}{N !}
+\end{equation}
+
+For K=2, the multinomial distribution becomes the binomial distribution.
+
+%\subsubsection{The Binomial Distribution}
+
+%\subsubsection{The Multinomial Distribution}
+
+\subsubsection{Maximum Likehood Estimation of Frequency Matrices}
+\label{sec:mlintuitive}
+
+Given a count vector of observations $\vec{n} = n_1, ... n_K$, how to estimate the frequencies $\vec{\theta} = \theta_1, ... , \theta_K$ that best explain these observations? Intuitively the answer is $\theta_i \approx n_i / N$. We now demonstrate that this intuitive result actually follows from a maximum likelihood estimation of $\theta$ given $n$, using the fact that $P(n|\theta)$ is multinomially distributed.
+
+The goal is to solve the maximization problem:
+\begin{equation}
+\theta^{ML} = \argmax_\theta P(n|\theta) = \argmax_\theta \mathcal{M}(n;\theta)
+\end{equation}
+under the constraint that $\sum_{i=1}^K \theta_i = 1$ (there is also the constraint that $0 \le \theta_i \le 1 \forall i$ but let's put it aside it for now). The formulation of the optimization problem becomes:
+%
+\begin{eqnarray}
+\max f(\theta) & = & \mathcal{M}(n;\theta)  \quad \text{subject to} \\
+g(\theta) & = & \sum_{i=1}^K \theta_i - 1 = 0
+\label{eq:multinomial:constr}
+\end{eqnarray}
+
+This problem can be solved using the method of Lagrange multipliers:
+\begin{equation}
+\max \mathcal{Q}(\theta, \lambda) = f(\theta) + \lambda g(\theta) =
+\mathcal{M}(n;\theta)  + \lambda \left( \sum_{i=1}^K \theta_i - 1 \right)
+\label{eq:multinomial:qmax}
+\end{equation}
+
+The solution is found by setting both partial derivatives of $\mathcal{Q}$ to zero:
+\begin{eqnarray}
+\frac{\partial \mathcal{Q}(\theta, \lambda)}{\partial \theta} & = & 0  \quad \text{and} 
+\label{eq:multinomial:deriv1}
+\\
+\frac{\partial \mathcal{Q}(\theta, \lambda)}{\partial \lambda} & = & 0 
+\label{eq:multinomial:deriv2}
+\end{eqnarray}
+
+Solving eq. (\ref{eq:multinomial:deriv2}) simply leads to eq. (\ref{eq:multinomial:constr}), confirming that solving the unconstrained problem in eq. (\ref{eq:multinomial:qmax}) is sufficient to solve the original constrained problem.
+
+Let us solve eq. (\ref{eq:multinomial:deriv1}) for each $\theta_i$:
+\begin{eqnarray}
+\frac{\partial \mathcal{Q}(\theta, \lambda)}{\partial \theta_i} =
+\frac{\partial}{\partial \theta_i}
+   \left( \mathcal{M}(n;\theta) \right) + 
+\frac{\partial}{\partial \theta_i}
+   \lambda \left( \sum_{i=1}^K \theta_i - 1 \right)
+\label{eq:multinomial:deriv1:sol0}
+\end{eqnarray}
+
+The second term of the above sum is easier to solve: all terms that do not involve $\theta_i$ become constants, with derivative zero. We're left with only the derivative of $\lambda \theta_i$ with respect to $\theta_i$, which is simply $\lambda$:
+\begin{eqnarray}
+\frac{\partial}{\partial \theta_i}
+   \lambda \left( \sum_{i=1}^K \theta_i - 1 \right) =
+\lambda
+\label{eq:multinomial:deriv1:sol2}
+\end{eqnarray}
+
+Now let us solve the first term of eq. (\ref{eq:multinomial:deriv1:sol0}):
+\begin{eqnarray}
+\frac{\partial}{\partial \theta_i}
+   \left( \mathcal{M}(n;\theta) \right) & = &
+\frac{\partial}{\partial \theta_i}
+   \left( \frac{1}{M(n)} \prod_{i=1}^K \theta_i ^ {n_i} \right) =
+\frac{1}{M(n)} \; \frac{\partial}{\partial \theta_i}
+   \prod_{i=1}^K \theta_i ^ {n_i}
+\\
+& = & 
+\frac{1}{M(n)} \; \frac{\partial}{\partial \theta_i}
+  \theta_1^{n_1} \times ... \times \theta_i^{n_i}
+  \times ... \theta_K^{n_K}
+\\
+& = & 
+\frac{1}{M(n)} \;
+  n_i \;
+  \theta_1^{n_1} \times ... \times
+  \theta_i^{n_i - 1}
+  \times ... \theta_K^{n_K}
+\\
+& = & 
+\frac{1}{M(n)} \;
+  n_i \;
+  \theta_1^{n_1} \times ... \times 
+  \frac{\theta_i^{n_i}}{\theta_i}
+  \times ... \theta_K^{n_K} 
+\\
+& = & 
+\frac{1}{M(n)} \;
+  \frac{n_i}{\theta_i} \;
+  \theta_1^{n_1} \times ... \times 
+  \theta_i^{n_i}
+  \times ... \theta_K^{n_K} 
+\\
+& = & 
+\frac{1}{M(n)} \;
+  \frac{n_i}{\theta_i} \; \prod_{i=1}^K \theta_i ^ {n_i}
+\\
+& = & 
+\frac{n_i}{\theta_i} \;
+\frac{1}{M(n)} \; \prod_{i=1}^K \theta_i ^ {n_i}
+\\
+& = & 
+\frac{n_i}{\theta_i} \; \mathcal{M}(n ; \theta)
+\label{eq:multinomial:deriv1:sol1}
+\end{eqnarray}
+
+Now combine eqs. (\ref{eq:multinomial:deriv1:sol1}) and (\ref{eq:multinomial:deriv1:sol2}) to obtain the solution of eq. (\ref{eq:multinomial:deriv1}):
+\begin{eqnarray}
+\frac{\partial \mathcal{Q}(\theta, \lambda)}{\partial \theta} & = & 0 
+\Rightarrow \\
+\frac{n_i}{\theta_i} \; \mathcal{M}(n ; \theta) + \lambda & = & 0
+\label{eq:multinomial:deriv1:final}
+\end{eqnarray}
+
+The sum of eq. (\ref{eq:multinomial:deriv1:final}) over all $i$'s should still be zero:
+\begin{eqnarray}
+\sum_{i=1}^K \left( \frac{n_i}{\theta_i} \; \mathcal{M}(n ; \theta) + \lambda \right) & = & 0 
+\Rightarrow \\
+\sum_{i=1}^K  \left( \frac{n_i}{\theta_i} \; \mathcal{M}(n ; \theta) \right)
++
+ \sum_{i=1}^K \lambda & = & 0 
+\Rightarrow \\
+\mathcal{M}(n ; \theta) \sum_{i=1}^K \frac{n_i}{\theta_i}
++ K \lambda & = & 0 
+\label{eq:multinomial:deriv1:sum}
+\end{eqnarray}
+
+Let's call $S = \sum_{i=1}^K \frac{n_i}{\theta_i}$:
+\begin{equation}
+\mathcal{M}(n ; \theta) \; S + K \lambda = 0 
+\Rightarrow
+\lambda = - \frac{S}{K} \; \mathcal{M}(n ; \theta)
+\label{eq:multinomial:deriv1:lambda}
+\end{equation}
+
+Now substitute eq. (\ref{eq:multinomial:deriv1:lambda}) back in eq. (\ref{eq:multinomial:deriv1:final}):
+\begin{eqnarray}
+\frac{n_i}{\theta_i} \; \mathcal{M}(n ; \theta) + \lambda & = & 0
+\Rightarrow \\
+\frac{n_i}{\theta_i} \; \mathcal{M}(n ; \theta)
+- \frac{S}{K} \; \mathcal{M}(n ; \theta)
+& = & 0
+\Rightarrow \\
+\mathcal{M}(n ; \theta) \left(
+\frac{n_i}{\theta_i} \; 
+- \frac{S}{K} \right)
+& = & 0
+\label{eq:multinomial:deriv1:backtoi}
+\end{eqnarray}
+
+Assuming that $\mathcal{M}(n ; \theta) \ne 0$, we must have:
+\begin{equation}
+\frac{n_i}{\theta_i} \; - \frac{S}{K} = 0
+\Rightarrow
+\frac{n_i}{\theta_i} = \frac{S}{K}
+\Rightarrow
+\theta_i = \frac{K}{S} n_i
+\label{eq:multinomial:deriv1:thetai}
+\end{equation}
+
+But remember our constraint that all $\theta_i$'s must sum to one, therefore:
+\begin{equation}
+\sum_{i=1}^K \theta_i = \sum_{i=1}^K \frac{K}{S} n_i = 1
+\Rightarrow
+\frac{K}{S} \sum_{i=1}^K n_i = 1
+\Rightarrow
+\frac{K}{S} N = 1
+\Rightarrow
+S = K N
+\label{eq:multinomial:deriv1:skn}
+\end{equation}
+
+Now substitute eq. (\ref{eq:multinomial:deriv1:skn}) back in eq. (\ref{eq:multinomial:deriv1:thetai}):
+\begin{equation}
+\theta_i = \frac{K}{S} n_i
+\Rightarrow
+\theta_i = \frac{K}{K N} n_i
+\Rightarrow
+\theta_i = \boxed{\theta_i^{\text{ML}} = \frac{n_i}{N}}
+\label{eq:thetaml}
+\end{equation}
+which is the intuitive estimation of $\theta_i$ that is used everywhere. However there is a major problem with eq. (\ref{eq:thetaml}): If there are no observations for amino acid or base $i$, hence $n_i=0$, $\theta_i$ becomes zero which is not a good estimation unless we have a huge number of observations in total (huge $N$) so that we are sure that $i$ really never occurs.
+
+\subsection{Prior and Posterior Estimations Using the Dirichlet Distribution}
+
+In the previous section we saw that the likelihood term of Bayesian inference follows a multinomial distribution. In this section we will see that the prior follows a Dirichlet distribution, and that the posterior can be inferred from the prior and the likelihood using Bayesian inference, resulting in a posterior that is also Dirichlet-distributed. The property that a Multinomial likelihood combined with a Dirichlet prior results in a Dirichlet posterior is called {\bf conjugacy}:
+
+\begin{verbatim}
+posterior = likelihood  * prior     / evidence
+    |           |           | 
+Dirichlet = Multinomial * Dirichlet / evidence
+\end{verbatim}
+
+\subsubsection{Prior Estimation Using the Dirichlet Distribution}
+\label{sec:prior:dirichlet}
+
+When we don't know the frequencies $\theta_i, i=1,...,K$ we need to estimate the distribution of these frequencies. This is my prior distribution. The parameters $\vec{\theta} = \theta_1, ... \theta_K$ are probabilities, hence we are looking for the probability distribution of a vector of probabilities, which is like a {\em ``dice factory''}. The Dirichlet distribution does this job, hence {\bf the prior follows a Dirichlet Distribution}:
+%
+\begin{equation}
+P(\vec{\theta}) \sim \mathcal{D}(\theta ; \alpha) = 
+\frac{1}{Z(\alpha)} \prod_{i=1}^K \theta_i ^ {(\alpha_i - 1)}
+\end{equation}
+with parameters $\alpha_i > 0, i=1,...,K$. Note that the $\alpha_i$ do not need to be integers: $\alpha_i \in \mathbb{R}$.
+
+The function $Z(\alpha)$ is a normalization factor similar to the $M(n)$ factor used in the Multinomial distribution, but now extended to real numbers:
+%
+\begin{eqnarray}
+Z(\alpha) & = & \frac{\prod_{i=1}^K \Gamma(\alpha_i) }{\Gamma(A)} \\
+A & = & \alpha_1 + \alpha_2 + ... + \alpha_K
+\end{eqnarray}
+
+The function $\Gamma()$ is a generalization of the factorial function for real numbers:
+\begin{equation}
+\Gamma(x + 1) = x \; \Gamma(x)
+\end{equation}
+
+For $n$ integer:
+\begin{equation}
+\Gamma(n + 1) = n \; \Gamma(n) = n \; (n-1) \; \Gamma(n-1) = n (n-1) (n-2) ... 1 = n!
+\end{equation}
+
+\subsubsection{Bayesian Inference of the Posterior Distribution}
+
+We start with the Bayesian Inference equation (\ref{eq:bayesinf}), where the model is assumed as given (so we don't have to write it down explicitly), and my data $D$ is the vector of counts $n = \vec{n} = n_1, ... n_K$ summing to $N$:
+\begin{equation}
+P(\theta|n) = \frac{P(n|\theta) \; P(\theta)}{P(n)}
+\label{eq:priorinf0}
+\end{equation}
+
+Since the likelihood $P(n|\theta)$ follows a multinomial distribution (from section \ref{sec:likelihood:multinomial}), and the prior $P(\theta)$ follows a Dirichlet distribution (sec. \ref{sec:prior:dirichlet}):
+\begin{eqnarray}
+P(\theta|n) & = & \frac{\mathcal{M}(n;\theta) \; \mathcal{D}(\theta;\alpha)}{P(n)}
+\\
+& = &
+\frac{1}{P(n)} \;
+\frac{1}{M(n)} \prod_{i=1}^K \theta_i ^ {n_i} \;
+\frac{1}{Z(\alpha)} \prod_{i=1}^K \theta_i ^ {(\alpha_i - 1)}
+\\
+& = &
+\frac{1}{P(n) M(n) Z(\alpha)} \;
+\prod_{i=1}^K \theta_i ^ {n_i} \; \theta_i ^ {(\alpha_i - 1)}
+\\
+& = &
+\frac{1}{P(n) M(n) Z(\alpha)} \;
+\prod_{i=1}^K \theta_i ^ {(n_i + \alpha_i) - 1}
+\label{eq:priorinf1}
+\end{eqnarray}
+
+The product term looks like a Dirichlet distribution with parameters $\alpha_i' = n_i + \alpha_i$, except that the term $Z(\alpha') = Z(n + \alpha)$ is missing. So we include it in both numerator and denominator, so that the result is not altered:
+\begin{eqnarray}
+P(\theta|n) & = &
+\frac{Z(n + \alpha)}{P(n) M(n) Z(\alpha) Z(n + \alpha)} \;
+\prod_{i=1}^K \theta_i ^ {(n_i + \alpha_i) - 1}
+\\
+& = &
+\frac{Z(n + \alpha)}{P(n) M(n) Z(\alpha)} \; \mathcal{D}(\theta; n + \alpha)
+\label{eq:priorinf2}
+\end{eqnarray}
+
+Since the posterior distribution is a probability distribution, it must sum to one, therefore:
+\begin{eqnarray}
+\int_\theta P(\theta|n) \; d\theta & = & 1 
+\Rightarrow \\
+\int_\theta \frac{Z(n + \alpha)}{P(n) M(n) Z(\alpha)} \; \mathcal{D}(\theta; n + \alpha) \; d\theta & = & 1
+\Rightarrow \\
+\frac{Z(n + \alpha)}{P(n) M(n) Z(\alpha)} \; \int_\theta \mathcal{D}(\theta; n + \alpha) \; d\theta & = & 1
+\label{eq:priorinf3}
+\end{eqnarray}
+
+We know that $\mathcal{D}(\theta; n + \alpha)$ is a distribution hence it must sum to one, thus
+\begin{equation}
+\int_\theta \mathcal{D}(\theta; n + \alpha) \; d\theta = 1
+\end{equation}
+
+Therefore:
+\begin{eqnarray}
+\frac{Z(n + \alpha)}{P(n) M(n) Z(\alpha)} & = & 1
+\Rightarrow \\
+Z(n + \alpha) & = & P(n) M(n) Z(\alpha)
+\Rightarrow \\
+P(n) & = &\frac{Z(n + \alpha)}{Z(\alpha) M(n)}
+\label{eq:priorinf4}
+\end{eqnarray}
+
+So when the evidence $P(n)$ obeys eq. (\ref{eq:priorinf4}) above, the posterior follows a Dirichlet distribution. Indeed by substituting eq. (\ref{eq:priorinf4}) in eq. (\ref{eq:priorinf2}) we immediately get:
+\begin{equation}
+P(\theta|n) \sim \mathcal{D}(\theta; n + \alpha)
+\label{eq:posterior:dirichlet}
+\end{equation}
+which indeed states that the posterior follows a Dirichlet distribution with parameters $n + \alpha$.
+
+\subsubsection{Estimating the Average of the Posterior: Pseudocounts}
+\label{sec:pseudocounts}
+
+Now that we know that the posterior $P(\theta|n)$ follows a Dirichlet distribution, we are insterested in the average of the posterior, which is the Posterior Mean Estimate (PME, sec. \ref{sec:PME}):
+%
+\begin{equation}
+\theta^{\text{PME}} 
+= \int_{\theta} \theta \; P(\theta|n) \; d \theta 
+= \int_{\theta} \theta \; \mathcal{D}(\theta; n + \alpha) \; d \theta 
+\label{eq:thetapme1}
+\end{equation}
+
+Since $\theta$ is a vector, we will compute the average for each $\theta_i$ individually:
+\begin{eqnarray}
+\theta_i^{\text{PME}} & = & 
+\int_{\theta} \theta_i \; \mathcal{D}(\theta; n + \alpha) \; d \theta 
+\label{eq:thetapme2}
+\\
+& = &
+\int_{\theta} \theta_i \; 
+\frac{1}{Z(n + \alpha)} \;
+\prod_{j=1}^K \theta_j ^ {(n_j + \alpha_j) - 1}
+\; d \theta 
+\\
+& = &
+\frac{1}{Z(n + \alpha)} \;
+\int_{\theta} \theta_i \; 
+\prod_{j=1}^K \theta_j ^ {(n_j + \alpha_j) - 1}
+\; d \theta 
+\end{eqnarray}
+
+It would be nice if we could introduce the term $\theta_i$ into the product $\prod_j$ somehow. This can be done by adding a binary variable $\delta_{ij} = 1$ when $i=j$, and $\delta_{ij} = 0$ otherwise:
+\begin{equation}
+\theta_i^{\text{PME}} =  
+\frac{1}{Z(n + \alpha)} \;
+\int_{\theta} \;
+\prod_{j=1}^K \theta_j ^ {(n_j + \alpha_j + \delta_{ij}) - 1}
+\; d \theta 
+\end{equation}
+
+We now apply the same trick as we did for the Dirichlet prior: the product above looks almost like a Dirichlet, so let's force it into one by multiplying the missing term up and down:
+\begin{eqnarray}
+\theta_i^{\text{PME}} & = & 
+\frac{1}{Z(n + \alpha)} \;
+\int_{\theta} \;
+\frac{Z(n + \alpha + \delta_i)}{Z(n + \alpha + \delta_i)}
+\;
+\prod_{j=1}^K \theta_j ^ {(n_j + \alpha_j + \delta_{ij}) - 1}
+\; d \theta 
+\\
+& = &
+\frac{1}{Z(n + \alpha)} \;
+\int_{\theta} \;
+Z(n + \alpha + \delta_i) \;
+\mathcal{D}(\theta; n + \alpha + \delta_i)
+\; d \theta
+\\
+& = &
+\frac{Z(n + \alpha + \delta_i)}{Z(n + \alpha)} \;
+\int_{\theta}
+\mathcal{D}(\theta; n + \alpha + \delta_i)
+\; d \theta 
+\end{eqnarray}
+
+We end up again with the integral of a distribution, which is one as we have seen before. Thus:
+%
+\begin{equation}
+\theta_i^{\text{PME}} = \frac{Z(n + \alpha + \delta_i)}{Z(n + \alpha)}
+\end{equation}
+
+\begin{comment}
+\begin{eqnarray}
+\theta_i^{\text{PME}} & = & 
+\frac{Z(n + \alpha + \delta_i)}{Z(n + \alpha)}
+\\
+& = &
+\frac{\left( \prod_{j=1}^K \Gamma(n_j + \alpha_j + \delta_{ij}) \right) \;
+      \Gamma(N + A) }
+{\left( \prod_{j=1}^K \Gamma(n_j + \alpha_j) \right) \;
+  \Gamma(N + A + 1) }
+%\frac{(n + \alpha + \delta_i - 1) \Gamma (n + \alpha + \delta_i - 1)}{Z(n + \alpha)}
+\end{eqnarray}
+\end{comment}
+
+Developing each term:
+\begin{eqnarray}
+Z(n + \alpha + \delta_i) & = &
+\frac{\prod_{j=1}^K \Gamma(n_j + \alpha_j + \delta_{ij})}{\Gamma(N + A + 1)}
+\\
+& = &
+\frac{
+\Gamma(n_1 + \alpha_1)
+\Gamma(n_2 + \alpha_2) ...
+\Gamma(n_i + \alpha_i + 1) ...
+\Gamma(n_k + \alpha_k)
+}
+{\Gamma(N + A + 1)}
+\\
+Z(n + \alpha) & = &
+\frac{\prod_{j=1}^K \Gamma(n_j + \alpha_j)}{\Gamma(N + A)}
+\\
+& = &
+\frac{
+\Gamma(n_1 + \alpha_1)
+\Gamma(n_2 + \alpha_2) ...
+\Gamma(n_i + \alpha_i) ...
+\Gamma(n_k + \alpha_k)
+}
+{\Gamma(N + A)}
+\end{eqnarray}
+
+There are many common terms in both equations, so when dividing one by the other most of the terms cancel out, leading to:
+\begin{eqnarray}
+\theta_i^{\text{PME}} & = &
+\frac{Z(n + \alpha + \delta_i)}{Z(n + \alpha)}
+=
+\frac{\Gamma(n_i + \alpha_i + 1) \; \Gamma(N + A)}
+     {\Gamma(n_i + \alpha_i)     \; \Gamma(N + A + 1)}
+\\
+& = &
+\frac{(n_i + \alpha_i) \Gamma(n_i + \alpha_i) \; \Gamma(N + A)}
+     {\Gamma(n_i + \alpha_i)     \; (N + A) \Gamma(N + A))} \Rightarrow
+\end{eqnarray}
+
+\begin{equation}
+\boxed{\theta_i^{\text{PME}} = \frac{n_i + \alpha_i}{N+A}}
+\label{eq:theta:pseudo}
+\end{equation}
+which tells us that the average of the posterior distribution (or posterior mean estimate) is computed using {\bf pseudocounts $\alpha_i$}. The posterior mean estimate fixes the problem with the maximum likelihood estimator for $\theta$ (eq. (\ref{eq:thetaml})), in which observations with zero count ($n_i=0$) cancel out the entire probability estimation, which is not reasonable.
+
+\subsection{Dealing with Heterogeneity: The Dirichlet Mixture}
+
+In the previous section we have performed Bayesian inference for a case where there was no grouping in the data: the estimated frequences of amino acids were valid for any position in the alignment. In that case one probability distribution was good enough to describe the entire data and parameter space.
+
+Consider now a multiple sequence alignment involving G-Protein coupled receptors (GPCRs). These proteins alternate hydrophylic and hydrophobic domains: the priors for these domains may be different due to the different frequencies of amino acids in each domain (hydrophobic amino acids are more common in the hydrophobic part of the protein, and hydrophilic AAs in the hydrophilic domain). So we would need two different priors for each type of domain:
+%
+\begin{center}
+\begin{tabular}{ll}
+Prior for hydrophobic domains: & 
+$P(\theta^+) = \mathcal{D}(\theta^+ ; \alpha^+)$ \\
+Prior for hydrophilic domains: &
+$P(\theta^-) = \mathcal{D}(\theta^- ; \alpha^-)$
+\end{tabular}
+\end{center}
+
+However in practice we don't know when a domain starts or stops in the alignment, so we don't have the information to compute two separate priors. The solution is to generate a single vector $\theta$ from a {\bf Dirichlet Mixture} of $m$ different sources $S$ ($m=2$ in the GPCR example): a weighted average of $m$ Dirichlet distributions with different parameters $\alpha^k$, one per source $S$:
+%
+\begin{equation}
+P(\theta) = 
+\sum_k P(S=k) \; \mathcal{D}(\theta ; \alpha^k) =
+\sum_k q_k \; \mathcal{D}(\theta ; \alpha^k)
+\end{equation}
+where $q_k = P(S=k)$ is the frequency of source $S=k$.
+
+For the GPCR example this would become:
+\begin{equation}
+P(\theta) = 
+q^+ \; \mathcal{D}(\theta ; \alpha^+) + q^- \; \mathcal{D}(\theta ; \alpha^-)
+\end{equation}
+
+Now that we have the prior, we can compute the posterior distribution and its mean. Instead of using the Bayesian inference rule (eq. \ref{eq:bayesinf})) directly however, the derivations take a completely different path!! So before we begin, let's lay out some ingredients that we'll need later.
+
+If we know the source $S=k$ then:
+\begin{itemize}
+\item The frequency of source $S=k$ is $q_k$ as said before:
+\begin{equation}
+q_k = P(S=k)
+\label{eq:mix:qk}
+\end{equation}
+%
+\item The \textcolor{red}{{\bf prior} ????} that we use, given that we know the column of the alignment (data vector $n$) and the source $S=k$, is \textcolor{red}{the {\bf posterior} that we computed in eq. (\ref{eq:posterior:dirichlet}), for the particular $\alpha_k$}:
+\begin{equation}
+P(\theta|S=k, n) = \mathcal{D}(\theta; n + \alpha^k)
+\label{eq:mix:thetaskn}
+\end{equation}
+%
+\item The {\bf evidence}, given that I'm using a particular source $S=k$ is (just use $\alpha^k$ instead of $\alpha$ in eq. \ref{eq:priorinf4}):
+\begin{equation}
+P(n|S=k) = \frac{Z(n + \alpha^k)}{Z(\alpha^k) M(n)}
+\label{eq:mix:evid}
+\end{equation}
+%\item 
+\end{itemize}
+
+Using marginalization:
+\begin{equation}
+P(\theta|n) = \sum_{k} P(\theta, S=k | n) 
+            = \sum_{k} P(\theta | S=k, n) \; P(S=k|n)
+\label{eq:mix:thetan}
+\end{equation}
+
+We know $P(\theta | S=k, n)$ from eq. (\ref{eq:mix:thetaskn}).
+We can compute $P(S=k|n)$ using Bayes' rule:
+\begin{equation}
+P(S=k|n) = \frac{ P(n|S=k) \; P(S=k) }{ P(n) }
+\label{eq:mix:skn}
+\end{equation}
+
+We know that $P(S=k) = q_k$ (eq. (\ref{eq:mix:qk})), 
+and we know $P(n|S=k)$ from eq. (\ref{eq:mix:evid}).
+$P(n)$ can be computed by marginalization and with the help of eq. (\ref{eq:mix:evid}):
+\begin{eqnarray}
+P(n) & = & \sum_{l} P(n | S=l) \; P(S=l)  \\
+     & = & \sum_{l} q_l \; \frac{Z(n + \alpha^l)}{Z(\alpha^l) \; M(n)} \\
+     & = & \frac{1}{M(n)} \sum_{l} q_l \; \frac{Z(n + \alpha^l)}{Z(\alpha^l)} 
+\label{eq:mix:pn}
+\\
+& & \quad \quad \text{for} \quad l=1,..., m \nonumber
+\end{eqnarray}
+
+Substitute eqs. (\ref{eq:mix:qk}), (\ref{eq:mix:evid}), and (\ref{eq:mix:pn}) in eq. (\ref{eq:mix:skn}):
+\begin{eqnarray}
+P(S=k|n) & = &
+\frac{q_k \; Z(n + \alpha^k)}
+     { \left( \; 
+         \frac{1}{M(n)} \sum_{l} q_l \; \frac{Z(n + \alpha^l)}{Z(\alpha^l)} 
+ \; \right) Z(\alpha^k) \; M(n) }
+\quad \Rightarrow \\
+P(S=k|n) & = &
+\frac{q_k \; Z(n + \alpha^k) / Z(\alpha^k) }
+     {\sum_{l} q_l \; Z(n + \alpha^l) / Z(\alpha^l) }
+\label{eq:mix:skn2}
+\end{eqnarray}
+
+Now coming back to eq. (\ref{eq:mix:thetan}):
+\begin{equation}
+P(\theta|n) = \sum_{k} \mathcal{D}(\theta; n + \alpha^k) \; P(S=k|n)
+\label{eq:mix:thetan2}
+\end{equation}
+We know how to compute the term $P(S=k|n)$ using eq. (\ref{eq:mix:skn2}), but we won't substitute it here since it is a bit bulky.
+
+Using eq. (\ref{eq:mix:thetan2}), compute the posterior mean estimate for a given $\theta_i$:
+\begin{eqnarray}
+\theta_i^{\text{PME}} & = & \int_\theta \theta_i \; P(\theta|n) \; d \theta 
+\\
+& = &
+   \int_\theta \theta_i \sum_{k} \mathcal{D}(\theta; n + \alpha^k)
+   \; P(S=k|n) \; d \theta
+\\
+& = &
+   \int_\theta \sum_{k} \theta_i \; \mathcal{D}(\theta; n + \alpha^k)
+   \; P(S=k|n) \; d \theta
+\\
+& = &
+   \sum_{k} \int_\theta \theta_i \; \mathcal{D}(\theta; n + \alpha^k)
+   \; P(S=k|n) \; d \theta
+\\
+& = &
+   \sum_{k} 
+P(S=k|n) 
+\int_\theta \theta_i \; \mathcal{D}(\theta; n + \alpha^k)
+   \; d \theta
+\label{eq:mix:thetapme}
+\end{eqnarray}
+
+The manipulations above were possible because the integral of a sum is the sum of integrals, $\theta_i$ does not depend on $k$, and $P(S=k|n)$ does not depend on $\theta$.
+
+The remaining integral in eq. (\ref{eq:mix:thetapme}) is the same as eq. (\ref{eq:thetapme2}) for $\alpha=\alpha_k$, and we already know how to solve it: $\theta_i^{\text{PME}}$ can be calculated using the pseudocounts as demonstrated in eq. (\ref{eq:theta:pseudo}). Therefore, for a given source $S=k$:
+%
+\begin{equation}
+\theta_i^{\text{PME,k}} = 
+\int_\theta \theta_i \; \mathcal{D}(\theta; n + \alpha^k)
+   \; d \theta
+=
+\frac{n_i + \alpha_i^k}{N+A^k}
+\label{eq:mix:theta:pme}
+\end{equation}
+
+Finally, substitute eq. (\ref{eq:mix:theta:pme}) in eq. (\ref{eq:mix:thetapme}) to get:
+\begin{equation}
+\boxed{\theta_i^{\text{PME}} = \sum_{k} P(S=k|n) \; 
+                             \frac{n_i + \alpha_i^k}{N+A^k}}
+\label{eq:mix:theta:pseudo}
+\end{equation}
+%
+which means that the posterior mean estimate of parameters in a Dirichlet mixture is the weighted sum of the PME estimation using pseudocounts assuming a specific source $k$, weighted by the posterior probability that we chose the right source $k$ given the data $n$ from the alignment.
